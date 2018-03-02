@@ -14,6 +14,8 @@ import android.os.Bundle;
 import android.os.Environment;
 import android.os.IBinder;
 import android.preference.PreferenceManager;
+import android.support.annotation.NonNull;
+import android.support.annotation.Nullable;
 import android.support.design.widget.Snackbar;
 import android.support.v4.app.Fragment;
 import android.support.v4.app.FragmentManager;
@@ -60,6 +62,7 @@ import static android.view.View.GONE;
 import static org.kiwix.kiwixmobile.downloader.DownloadService.KIWIX_ROOT;
 import static org.kiwix.kiwixmobile.library.entity.LibraryNetworkEntity.Book;
 import static org.kiwix.kiwixmobile.utils.Constants.EXTRA_BOOK;
+import static org.kiwix.kiwixmobile.utils.Constants.EXTRA_BOOKS_ONLINE;
 import static org.kiwix.kiwixmobile.utils.Constants.PREF_STORAGE;
 import static org.kiwix.kiwixmobile.utils.Constants.PREF_STORAGE_TITLE;
 
@@ -87,7 +90,7 @@ public class LibraryFragment extends Fragment
   LibraryPresenter presenter;
   private NetworkBroadcastReceiver networkBroadcastReceiver;
   private boolean isReceiverRegistered = false;
-  private ArrayList<Book> books = new ArrayList<>();
+  private LinkedList<Book> books;
   private boolean mBound;
   private DownloadServiceConnection mConnection = new DownloadServiceConnection();
   private ZimManageActivity faActivity;
@@ -136,16 +139,13 @@ public class LibraryFragment extends Fragment
       displayNoItemsAvailable();
       return;
     }
-
+    this.books = books;
     Log.i("kiwix-showBooks", "Contains:" + books.size());
     libraryAdapter.setAllBooks(books);
-    if (faActivity.searchView != null) {
-      libraryAdapter.getFilter().filter(
-          faActivity.searchView.getQuery(),
-          i -> stopScanningContent());
-    } else {
-      libraryAdapter.getFilter().filter("", i -> stopScanningContent());
-    }
+
+    String query = (faActivity.searchView != null) ? faActivity.searchView.getQuery().toString() : "";
+    libraryAdapter.getFilter().filter(query, i -> stopScanningContent());
+
     libraryAdapter.notifyDataSetChanged();
     libraryList.setOnItemClickListener(this);
   }
@@ -326,6 +326,21 @@ public class LibraryFragment extends Fragment
       editor.putString(PREF_STORAGE_TITLE, getResources().getString(R.string.external_storage));
     }
     editor.apply();
+  }
+
+  @Override
+  public void onSaveInstanceState(@NonNull Bundle outState) {
+    super.onSaveInstanceState(outState);
+    outState.putSerializable(EXTRA_BOOKS_ONLINE, books);
+  }
+
+  @Override
+  public void onViewStateRestored(@Nullable Bundle savedInstanceState) {
+    super.onViewStateRestored(savedInstanceState);
+    if ((savedInstanceState != null && savedInstanceState.containsKey(EXTRA_BOOKS_ONLINE))) {
+      books = (LinkedList<Book>) savedInstanceState.getSerializable(EXTRA_BOOKS_ONLINE);
+      showBooks(books);
+    }
   }
 
   public class DownloadServiceConnection {
